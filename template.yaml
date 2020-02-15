@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Sample SAM configuration for Lambda@Edge to facilitate deployments and further updates
+
+Parameters:
+  Stage:
+    Type: String
+    AllowedValues:
+      - uat
+      - pre-prod
+      - production
+    Default: uat
+
+Mappings:
+  PoolAOriginMap:
+    uat:
+      Alias: "appform-uat.societyone.com.au.s3.amazonaws.com"
+    pre-prod:
+      Alias: "appform-pre-prod.societyone.com.au.s3.amazonaws.com"
+    production:
+      Alias: "appform.societyone.com.au.s3.amazonaws.com"
+  CNameMap:
+    uat:
+      Alias: "uat-apply.societyone.com.au,uat-quote.societyone.com.au"
+    pre-prod:
+      Alias: "pre-prod-apply.societyone.com.au,pre-prod-quote.societyone.com.au"
+    production:
+      Alias: "apply.societyone.com.au,quote.societyone.com.au"
+
+Resources:
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: 'true'
+        Comment: !Sub '${Stage} - CI/CD for Lambda@Edge'
+        Aliases: !Split [",", !FindInMap [CNameMap, !Ref Stage, Alias] ]
+        Origins:
+          Quantity: 1
+          Items:
+          - Id: !Ref Stage
+            DomainName: !FindInMap [PoolAOriginMap, !Ref Stage, Alias]
+            OriginPath: ''
+            CustomHeaders:
+              Quantity: 0
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: !Ref Stage
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+            Headers:
+              Quantity: 1
+              Items:
+              - x-content-pool
+            QueryStringCacheKeys:
+              Quantity: 0
+          TrustedSigners:
+            Enabled: false
+            Quantity: 0
+          ViewerProtocolPolicy: redirect-to-https
+          MinTTL: 0
+          AllowedMethods:
+            Quantity: 2
+            Items:
+            - HEAD
+            - GET
+            CachedMethods:
+              Quantity: 2
+              Items:
+              - HEAD
+              - GET
+          SmoothStreaming: false
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          Compress: false
+          FieldLevelEncryptionId: ''
+          LambdaFunctionAssociations:
+            - 
+              EventType: origin-request
+              LambdaFunctionARN: !Ref OriginRequestLambda.Version
+            - 
+              EventType: viewer-request
+              LambdaFunctionARN: !Ref ViewerRequestLambda.Version
+
+#     ---
+# CallerReference: '1549518818267'
+# Aliases:
+#   Quantity: 0
+# DefaultRootObject: ''
+# Origins:
+#   Quantity: 1
+#   Items:
+#   - Id: S3-appform-uat.societyone.com.au
+#     DomainName: appform-uat.societyone.com.au.s3.amazonaws.com
+#     OriginPath: ''
+#     CustomHeaders:
+#       Quantity: 0
+#     S3OriginConfig:
+#       OriginAccessIdentity: ''
+# OriginGroups:
+#   Quantity: 0
+#   Items: []
+# DefaultCacheBehavior:
+#   TargetOriginId: S3-appform-uat.societyone.com.au
+#   ForwardedValues:
+#     QueryString: false
+#     Cookies:
+#       Forward: none
+#     Headers:
+#       Quantity: 1
+#       Items:
+#       - x-content-pool
+#     QueryStringCacheKeys:
+#       Quantity: 0
+#   TrustedSigners:
+#     Enabled: false
+#     Quantity: 0
+#   ViewerProtocolPolicy: redirect-to-https
+#   MinTTL: 0
+#   AllowedMethods:
+#     Quantity: 2
+#     Items:
+#     - HEAD
+#     - GET
+#     CachedMethods:
+#       Quantity: 2
+#       Items:
+#       - HEAD
+#       - GET
+#   SmoothStreaming: false
+#   DefaultTTL: 86400
+#   MaxTTL: 31536000
+#   Compress: false
+#   LambdaFunctionAssociations:
+#     Quantity: 0
+#   FieldLevelEncryptionId: ''
+# CacheBehaviors:
+#   Quantity: 0
+# CustomErrorResponses:
+#   Quantity: 0
+# Comment: ''
+# Logging:
+#   Enabled: false
+#   IncludeCookies: false
+#   Bucket: ''
+#   Prefix: ''
+# PriceClass: PriceClass_All
+# Enabled: true
+# ViewerCertificate:
+#   CloudFrontDefaultCertificate: true
+#   MinimumProtocolVersion: TLSv1
+#   CertificateSource: cloudfront
+# Restrictions:
+#   GeoRestriction:
+#     RestrictionType: none
+#     Quantity: 0
+# WebACLId: ''
+# HttpVersion: http2
+# IsIPV6Enabled: true
+
+
+
+    OriginRequestLambda:
+        Type: AWS::Serverless::Function
+        Properties:
+          CodeUri: 
+          Role: !GetAtt LambdaEdgeFunctionRole.Arn
+          Runtime: nodejs8.10
+          Handler: originrequest.handler
+          Timeout: 5
+          AutoPublishAlias: live 
+
+    ViewerRequestLambda:
+        Type: AWS::Serverless::Function
+        Properties:
+          CodeUri: 
+          Role: !GetAtt LambdaEdgeFunctionRole.Arn
+          Runtime: nodejs8.10
+          Handler: originrequest.handler
+          Timeout: 5
+          AutoPublishAlias: live 
+
+    LambdaEdgeFunctionRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+          Path: "/"
+          ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Sid: "AllowLambdaServiceToAssumeRole"
+                Effect: "Allow"
+                Action: 
+                  - "sts:AssumeRole"
+                Principal:
+                  Service: 
+                    - "lambda.amazonaws.com"
+                    - "edgelambda.amazonaws.com"
+
+Outputs:
+    OriginRequestLambdaVersion: 
+      Description: Lambda@Edge Sample Function ARN with Version
+      Value: !Ref OriginRequestLambda.Version
+
+    CFDistribution: 
+      Description: Cloudfront Distribution Domain Name
+      Value: !GetAtt CFDistribution.DomainName
