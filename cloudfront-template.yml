@@ -95,4 +95,6 @@ Outputs:
     OaiS3CanonicalUserId:
       Description: Origin Access Identity S3CanonicalUserId
       Value: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+      Export:
+        Name: !Sub "${AWS::StackName}-OAI"
  
