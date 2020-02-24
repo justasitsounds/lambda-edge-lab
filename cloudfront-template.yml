@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A/B testing using cloudfront and lambda@edge
+
+Resources:
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: OAI
+  
+  OriginRequestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: edge-functions/src/
+      Role: !GetAtt edgeFunctionRole.Arn
+      Runtime: nodejs10.x
+      Handler: originrequest.handler
+      Timeout: 5
+      # More info at https://github.com/awslabs/serverless-application-model/blob/master/docs/safe_lambda_deployments.rst
+      AutoPublishAlias: live
+
+  ViewerRequestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: edge-functions/src/
+      Role: !GetAtt edgeFunctionRole.Arn
+      Runtime: nodejs10.x
+      Handler: viewerrequest.handler
+      Timeout: 5
+      AutoPublishAlias: live 
+
+  edgeFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-edgeFunction
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+              - edgelambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+
+  DummyBucket:
+    Type: "AWS::S3::Bucket"
+
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: 'AB testing Cloudfront distribution' 
+        Origins:
+          - Id: s3
+            DomainName: !Sub "${DummyBucket}.s3.${AWS::Region}.amazonaws.com"
+            S3OriginConfig:
+              OriginAccessIdentity: !Join [ "/", [ origin-access-identity, cloudfront, !Ref OriginAccessIdentity ]]
+        DefaultCacheBehavior:
+          TargetOriginId: s3
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+            Headers:
+              - x-content-pool
+          ViewerProtocolPolicy: redirect-to-https
+          MinTTL: 0
+          AllowedMethods:
+            - HEAD
+            - GET
+          CachedMethods:
+            - HEAD
+            - GET
+          SmoothStreaming: false
+          Compress: true
+          LambdaFunctionAssociations:
+            - 
+              EventType: origin-request
+              LambdaFunctionARN: !Ref OriginRequestLambda.Version
+            - 
+              EventType: viewer-request
+              LambdaFunctionARN: !Ref ViewerRequestLambda.Version
+
+Outputs:
+    CFDistribution: 
+      Description: Cloudfront Distribution Domain Name
+      Value: !GetAtt CFDistribution.DomainName
+    OaiS3CanonicalUserId:
+      Description: Origin Access Identity S3CanonicalUserId
+      Value: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+ 

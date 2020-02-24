@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A/B testing lambda@edge functions
+
+Resources:
+
+  OriginRequestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Role: !GetAtt edgeFunctionRole.Arn
+      Runtime: nodejs10.x
+      Handler: originrequest.handler
+      Timeout: 5
+      # More info at https://github.com/awslabs/serverless-application-model/blob/master/docs/safe_lambda_deployments.rst
+      AutoPublishAlias: live
+
+  ViewerRequestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Role: !GetAtt edgeFunctionRole.Arn
+      Runtime: nodejs10.x
+      Handler: viewerrequest.handler
+      Timeout: 5
+      AutoPublishAlias: live 
+
+  edgeFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-edgeFunction
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+              - edgelambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+
+Outputs:
+
+  OriginRequestLambdaARN:
+    Value: !Ref OriginRequestLambda.Version
+    Export:
+      Name: !Sub "${AWS::StackName}-OriginReqlambda"
+
+  ViewerRequestLambdaARN:
+    Value: !Ref ViewerRequestLambda.Version
+    Export:
+      Name: !Sub "${AWS::StackName}-ViewerReqlambda"
