@@ -51,10 +51,17 @@ Resources:
   DummyBucket:
     Type: "AWS::S3::Bucket"
 
+  LogBucket:
+    Type: "AWS::S3::Bucket"
+    BucketName: !Sub $(AWS::StackName)-cf-logs
+
   CFDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Logging:
+          Bucket: !Ref LogBucket
+          IncludeCookies: true
         Enabled: true
         Comment: 'AB testing Cloudfront distribution' 
         Origins:
