@@ -21,13 +21,14 @@ exports.handler = async function(event, context, callback) {
     const request = event.Records[0].cf.request;
     const headers = request.headers;
     const parsedCookies = parseCookies(headers);
-    let pooldest = 'a'
+    let targetPool = 'a'
     
     if(parsedCookies && parsedCookies['pool']){
-        pooldest = parsedCookies['pool'];
+        targetPool = parsedCookies['pool'];
     }
 
-    request.headers[customContentHeader] = [{ key: customContentHeader, value: pooldest}];
+    request.headers['Set-Cookie'] = 'pool=' + targetPool;
+    request.headers[customContentHeader] = [{ key: customContentHeader, value: targetPool}];
 
     console.log(JSON.stringify(request));
 
