@@ -1,9 +1,0 @@
-version = 0.1
-[default]
-[default.deploy]
-[default.deploy.parameters]
-stack_name = "lambda-edge-lab-functions"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-181hbrbp31d9j"
-s3_prefix = "lambda-edge-lab-functions"
-region = "us-east-1"
-capabilities = "CAPABILITY_NAMED_IAM"

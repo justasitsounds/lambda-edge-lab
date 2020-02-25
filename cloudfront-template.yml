@@ -54,14 +54,14 @@ Resources:
   LogBucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Sub $(AWS::StackName)-cf-logs
+      BucketName: !Sub ${AWS::StackName}-cf-logs
 
   CFDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Logging:
-          Bucket: !Ref LogBucket
+          Bucket: !GetAtt LogBucket.DomainName
           IncludeCookies: true
         Enabled: true
         Comment: 'AB testing Cloudfront distribution' 
@@ -95,6 +95,23 @@ Resources:
             - 
               EventType: viewer-request
               LambdaFunctionARN: !Ref ViewerRequestLambda.Version
+  
+  DummyAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: DummyBucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: 2
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref DummyBucket, "/*"]] 
 
 Outputs:
     CFDistribution: 

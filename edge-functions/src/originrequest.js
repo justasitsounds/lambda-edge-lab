@@ -11,7 +11,7 @@ exports.handler = (event, context, callback) => {
     const headers = request.headers;
 
     console.log("origin request");
-    console.log(event);
+    console.log(JSON.stringify(event));
 
     if (headers && headers[customContentHeader]) {
 
@@ -31,6 +31,8 @@ exports.handler = (event, context, callback) => {
             request.headers['host'] = [{ key: 'host', value: s3Origin }];
         }
     }
+
+    console.log(JSON.stringify(request));
 
     callback(null, request);
 };

@@ -17,7 +17,7 @@ function parseCookies(headers) {
 
 exports.handler = async function(event, context, callback) {
     console.log("viewerrequest");
-    console.log(event);
+    console.log(JSON.stringify(event));
     const request = event.Records[0].cf.request;
     const headers = request.headers;
     const parsedCookies = parseCookies(headers);
@@ -28,6 +28,8 @@ exports.handler = async function(event, context, callback) {
     }
 
     request.headers[customContentHeader] = [{ key: customContentHeader, value: pooldest}];
+
+    console.log(JSON.stringify(request));
 
     callback(null, request);
 };
