@@ -53,7 +53,8 @@ Resources:
 
   LogBucket:
     Type: "AWS::S3::Bucket"
-    BucketName: !Sub $(AWS::StackName)-cf-logs
+    Properties:
+      BucketName: !Sub $(AWS::StackName)-cf-logs
 
   CFDistribution:
     Type: AWS::CloudFront::Distribution
