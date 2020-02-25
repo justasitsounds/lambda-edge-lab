@@ -1,8 +1,6 @@
 'use strict';
 
-const AWS = require('aws-sdk');
 const customContentHeader = 'x-content-pool';
-var s3 = new AWS.S3();
 
 function parseCookies(headers) {
     const parsedCookie = {};
@@ -18,15 +16,18 @@ function parseCookies(headers) {
 }
 
 exports.handler = async function(event, context, callback) {
+    console.log("viewerrequest");
+    console.log(event);
     const request = event.Records[0].cf.request;
     const headers = request.headers;
     const parsedCookies = parseCookies(headers);
+    let pooldest = 'a'
     
     if(parsedCookies && parsedCookies['pool']){
-        const pooldest = parsedCookies['pool'];
- 
-        request.headers[customContentHeader] = [{ key: customContentHeader, value: pooldest}];
+        pooldest = parsedCookies['pool'];
     }
+
+    request.headers[customContentHeader] = [{ key: customContentHeader, value: pooldest}];
 
     callback(null, request);
 };
