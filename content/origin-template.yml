@@ -48,12 +48,9 @@ Resources:
           Principal:
             CanonicalUser: !Ref OriginAccessIdentity
           Action: s3:GetObject
-          Resource:
-            Fn::Join:
-            - ''
-            - - 'arn:aws:s3:::'
-              - Ref: OriginABucket
-              - "/*"
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginABucket, "/*"]]
+            # - !Join [ "", [ "arn:aws:s3:::", !Ref OriginBBucket, "/*"]] 
 
   OriginBAccessBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -62,16 +59,20 @@ Resources:
         Ref: OriginBBucket
       PolicyDocument:
         Version: '2008-10-17'
-        Id: PolicyForCloudFrontPrivateContentB
+        Id: PolicyForCloudFrontPrivateContentA
         Statement:
         - Sid: '1'
           Effect: Allow
           Principal:
-            CanonicalUser: !Ref OriginAccessIdentity!
+            CanonicalUser: !Ref OriginAccessIdentity
           Action: s3:GetObject
-          Resource:
-            Fn::Join:
-            - ''
-            - - 'arn:aws:s3:::'
-              - Ref: OriginBBucket
-              - "/*"
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginBBucket, "/*"]] 
+
+Outputs:
+  BucketADomain:
+    Description: Regional Domian name of the A bucket
+    Value: !GetAtt OriginABucket.RegionalDomainName
+  BucketBDomain:
+    Description: Regional Domian name of the A bucket
+    Value: !GetAtt OriginBBucket.RegionalDomainName
