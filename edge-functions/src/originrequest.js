@@ -1,6 +1,6 @@
 'use strict';
 
-const buckets = {
+const origins = {
     a:'ab-test-a.s3.ap-southeast-2.amazonaws.com',
     b:'ab-test-b.s3.ap-southeast-2.amazonaws.com'
 };
@@ -33,12 +33,11 @@ exports.handler = (event, context, callback) => {
         targetPool = parsedCookies[cookieName];
     }
 
-    let s3Origin = buckets[targetPool];
+    let s3Origin = origins[targetPool];
     
     requestOrigin.region = 'ap-southeast-2'; 
     requestOrigin.domainName = s3Origin;
     headers['host'] = [{ key: 'host', value: s3Origin }];
-    headers['Cookie'] = [{key: 'Cookie',value:'random=' + targetPool}];
 
     console.log(JSON.stringify(request));
 
