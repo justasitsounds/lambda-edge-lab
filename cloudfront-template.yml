@@ -77,7 +77,9 @@ Resources:
           ForwardedValues:
             QueryString: false
             Cookies:
-              Forward: all
+              Forward: whitelist
+              WhitelistedNames:
+                - pool
             Headers:
               - x-content-pool
           ViewerProtocolPolicy: redirect-to-https
