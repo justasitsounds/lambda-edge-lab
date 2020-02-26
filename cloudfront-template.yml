@@ -75,7 +75,7 @@ Resources:
           ForwardedValues:
             QueryString: false
             Cookies:
-              Forward: none
+              Forward: all
             Headers:
               - x-content-pool
           ViewerProtocolPolicy: redirect-to-https

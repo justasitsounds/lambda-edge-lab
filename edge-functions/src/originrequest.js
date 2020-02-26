@@ -25,6 +25,7 @@ exports.handler = (event, context, callback) => {
     requestOrigin.region = 'ap-southeast-2'; 
     requestOrigin.domainName = s3Origin;
     request.headers['host'] = [{ key: 'host', value: s3Origin }];
+    request.headers['Set-Cookie'] = [{key: 'Set-Cookie',value:'ogcansetcookies=true'}];
 
     console.log(JSON.stringify(request));
 
