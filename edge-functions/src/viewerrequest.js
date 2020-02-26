@@ -27,7 +27,7 @@ exports.handler = async function(event, context, callback) {
         targetPool = parsedCookies['pool'];
     }
 
-    request.headers['Set-Cookie'] = 'pool=' + targetPool;
+    request.headers['Set-Cookie'] = [{key: 'Set-Cookie',value:'pool=' + targetPool}];
     request.headers[customContentHeader] = [{ key: customContentHeader, value: targetPool}];
 
     console.log(JSON.stringify(request));
