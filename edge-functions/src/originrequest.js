@@ -2,7 +2,7 @@
 
 const buckets = {
     a:'ab-test-a.s3.ap-southeast-2.amazonaws.com',
-    b:'ab-test-a.s3.ap-southeast-2.amazonaws.com'
+    b:'ab-test-b.s3.ap-southeast-2.amazonaws.com'
 };
 const customContentHeader = 'x-content-pool';
 
@@ -16,7 +16,7 @@ exports.handler = (event, context, callback) => {
     console.log(JSON.stringify(event));
 
     if (headers && headers[customContentHeader]) {
-        console.log('headers[customContentHeader] == ' + headers[customContentHeader]);
+        console.log('headers[customContentHeader] == ' + JSON.stringify(headers[customContentHeader]));
         if (headers[customContentHeader][0].value !== ''){
             s3Origin = buckets[headers[customContentHeader][0].value]; 
         }
