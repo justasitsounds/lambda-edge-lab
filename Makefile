@@ -1,10 +1,11 @@
 TAGS:="purpose=lab project=lambda-edge-ab"
-EDGE_STACK = lambda-edge-ab
+EDGE_STACK = lambda-edge-dist
+ORIGIN_STACK = lambda-edge-origins
 CLOUDFRONT_TEMPLATE = cloudfront-template.yml
 ORIGIN_TEMPLATE = ./content/origin-template.yml
-OAI:=$(shell aws cloudformation describe-stacks --stack-name edge-cf --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`OaiS3CanonicalUserId`].OutputValue[]' --output text)
+OAI:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`OaiS3CanonicalUserId`].OutputValue[]' --output text)
 
-.PHONY: deploy-clicktracker upload-origin upload-index invalidate-cache clean package deploy-distribution deploy-origins
+.PHONY: deploy-clicktracker upload-origin upload-index invalidate-cache clean package deploy-distribution deploy-origins teardown-origins
 
 clean:
 	rm -rf dist/
@@ -31,7 +32,10 @@ invalidate-cache:
 	aws cloudfront create-invalidation --distribution-id $(DISTRIBUTIONID) --paths "/index.html" 
 
 deploy-distribution:
-	sam deploy --template-file $(CLOUDFRONT_TEMPLATE) --tags $(TAGS)
+	sam deploy --template-file $(CLOUDFRONT_TEMPLATE) --tags $(TAGS) --stack-name $(EDGE_STACK)
 
 deploy-origins:
-	sam deploy --template-file $(ORIGIN_TEMPLATE) --tags $(TAGS) --parameter-overrides "OriginAccessIdentity=$(OAI)"
+	sam deploy --template-file $(ORIGIN_TEMPLATE) --tags $(TAGS) --stack-name $(ORIGIN_STACK) --parameter-overrides "OriginAccessIdentity=$(OAI)"
+
+teardown-origins:
+	aws cloudformation delete-stack --stack-name $(ORIGIN_STACK)
