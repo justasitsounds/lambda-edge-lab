@@ -4,8 +4,9 @@ ORIGIN_STACK = lambda-edge-origins
 CLOUDFRONT_TEMPLATE = cloudfront-template.yml
 ORIGIN_TEMPLATE = ./content/origin-template.yml
 OAI:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`OaiS3CanonicalUserId`].OutputValue[]' --output text)
+DISTRIBUTION_ID:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`DistributionID`].OutputValue[]' --output text)
 
-.PHONY: deploy-clicktracker upload-origin upload-index invalidate-cache clean package deploy-distribution deploy-origins teardown-origins
+.PHONY: deploy-clicktracker upload-origin upload-index invalidate-cache clean package deploy-distribution deploy-origins teardown-origins setup reset
 
 clean:
 	rm -rf dist/
@@ -25,11 +26,11 @@ upload-origin:
 	aws s3 cp ./content/origin-b/ s3://ab-test-b --recursive
 
 upload-index:
-	aws s3api put-object --bucket ab-test-a --content-type text/html --cache-control maxage=0 --key index.html --body ./content/origin-a/index.html
-	aws s3api put-object --bucket ab-test-b --content-type text/html --cache-control maxage=0 --key index.html --body ./content/origin-b/index.html
+	aws s3api put-object --bucket ab-test-a --content-type text/html --cache-control max-age=0 --key index.html --body ./content/origin-a/index.html
+	aws s3api put-object --bucket ab-test-b --content-type text/html --cache-control max-age=0 --key index.html --body ./content/origin-b/index.html
 
 invalidate-cache:
-	aws cloudfront create-invalidation --distribution-id $(DISTRIBUTIONID) --paths "/index.html" 
+	aws cloudfront create-invalidation --distribution-id $(DISTRIBUTION_ID) --paths "/*" 
 
 deploy-distribution:
 	sam deploy --template-file $(CLOUDFRONT_TEMPLATE) --tags $(TAGS) --stack-name $(EDGE_STACK)
@@ -39,3 +40,9 @@ deploy-origins:
 
 teardown-origins:
 	aws cloudformation delete-stack --stack-name $(ORIGIN_STACK)
+
+setup: deploy-distribution
+	@echo "LAB SET UP"
+
+reset: invalidate-cache teardown-origins 
+	@echo "LAB RESET"

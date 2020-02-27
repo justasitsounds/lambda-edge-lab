@@ -80,9 +80,8 @@ Resources:
               Forward: whitelist
               WhitelistedNames:
                 - pool
-            Headers:
-              - x-content-pool
           ViewerProtocolPolicy: redirect-to-https
+          DefaultTTL: 30
           MinTTL: 0
           AllowedMethods:
             - HEAD
@@ -121,6 +120,11 @@ Outputs:
     CFDistribution: 
       Description: Cloudfront Distribution Domain Name
       Value: !GetAtt CFDistribution.DomainName
+
+    DistributionID:
+      Description: Cloudfront Distribution ID
+      Value: !Ref CFDistribution 
+
     OaiS3CanonicalUserId:
       Description: Origin Access Identity S3CanonicalUserId
       Value: !GetAtt OriginAccessIdentity.S3CanonicalUserId
