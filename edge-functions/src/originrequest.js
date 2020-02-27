@@ -6,7 +6,7 @@ const origins = {
 };
 const cookieName = 'pool';
 
-function parseCookies(headers) {
+const parseCookies = (headers) => {
     const parsedCookie = {};
     if (headers.cookie) {
         headers.cookie[0].value.split(';').forEach((cookie) => {
@@ -18,6 +18,8 @@ function parseCookies(headers) {
     }
     return parsedCookie;
 }
+
+const rollTheDice = () => Math.floor(Math.random()*3) === 0 ? 'b' : 'a';
 
 exports.handler = (event, context, callback) => {
     const request = event.Records[0].cf.request;
@@ -31,6 +33,8 @@ exports.handler = (event, context, callback) => {
 
     if(parsedCookies && parsedCookies[cookieName]){
         targetPool = parsedCookies[cookieName];
+    }else{
+        targetPool = rollTheDice();
     }
 
     let s3Origin = origins[targetPool];
