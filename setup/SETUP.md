@@ -24,7 +24,8 @@ Deploys a CloudFormation stack containing:
       -   A 'dummy' or default S3 origin bucket
       -   An S3 bucket for collecting CloudFront access logs
       -   A CloudFront Origin Access Identity for authenticating requests from the cloudfront distribution to the S3 origin buckets
-      -   2 x node10.x Lambda@edge functions:
+      -   3 x node10.x Lambda@edge functions:
+          -   ViewerRequest - associated with the distribution's viewer-request event 
           -   OriginRequest - associated with the distribution's origin-request event 
           -   OriginResponse - associated with the distribution's origin-response event
 
