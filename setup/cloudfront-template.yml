@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: A/B testing using cloudfront and lambda@edge
 
+Parameters:
+  randomSeed:
+    Description: A random see value to make buckets unique
+    Type: String
+
 Globals:
   Function:
     Runtime: nodejs10.x
@@ -58,12 +63,12 @@ Resources:
   DummyBucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Sub ${AWS::StackName}-dummybucket
+      BucketName: !Sub ${AWS::StackName}-dummybucket-${randomSeed}
 
   LogBucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Sub ${AWS::StackName}-cf-logs
+      BucketName: !Sub ${AWS::StackName}-cf-logs-${randomSeed}
 
   CFDistribution:
     Type: AWS::CloudFront::Distribution
