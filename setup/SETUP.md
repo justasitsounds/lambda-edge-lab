@@ -15,8 +15,11 @@ Instructions for setting up the lab
 ## Set Up:
 
 ```bash
+make distrobucket
 make setup
 ```
+
+*ignore the validation errors and the `Makefile:10: rand.mk: No such file or directory` errors* 
 
 Deploys a CloudFormation stack containing:
 
