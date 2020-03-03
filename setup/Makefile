@@ -1,11 +1,14 @@
 TAGS:="purpose=lab project=lambda-edge-ab"
-EDGE_STACK = lambda-edge-dist-ab2
+EDGE_STACK = lambda-edge-dist
 ORIGIN_STACK = lambda-edge-origins
 CLOUDFRONT_TEMPLATE = cloudfront-template.yml
 ORIGIN_TEMPLATE = ../content/origin-template.yml
 OAI:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`OaiS3CanonicalUserId`].OutputValue[]' --output text)
-ORIGIN_A:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`S3OriginA`].OutputValue[]' --output text)
-ORIGIN_B:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`S3OriginB`].OutputValue[]' --output text)
+RAND:=$$RANDOM
+# ORIGIN_A:=ab-test-a-$(RAND)
+# ORIGIN_B:=ab-test-b-$(RAND)
+ORIGIN_A:=ab-test-a-11303
+ORIGIN_B:=ab-test-b-16205
 DISTRIBUTION_ID:=$(shell aws cloudformation describe-stacks --stack-name $(EDGE_STACK) --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`DistributionID`].OutputValue[]' --output text)
 
 .PHONY: deploy-clicktracker upload-origin upload-index invalidate-cache clean package deploy-distribution deploy-origins teardown-origins setup reset
@@ -30,11 +33,14 @@ upload-index:
 invalidate-cache:
 	aws cloudfront create-invalidation --distribution-id $(DISTRIBUTION_ID) --paths "/*" 
 
-deploy-distribution:
-	sam deploy --template-file $(CLOUDFRONT_TEMPLATE) --tags $(TAGS) --stack-name $(EDGE_STACK) --parameter-overrides "OriginPrefix=$$RANDOM"
+deploy-distribution: ../edge-functions/src/origins_config.js 
+	sam deploy --template-file $(CLOUDFRONT_TEMPLATE) --tags $(TAGS) --stack-name $(EDGE_STACK) 
 
 deploy-origins:
-	sam deploy --template-file $(ORIGIN_TEMPLATE) --tags $(TAGS) --stack-name $(ORIGIN_STACK) --parameter-overrides "OriginAccessIdentity=$(OAI) OriginA=$(ORIGIN_A) OriginB=$(ORIGINB)"
+	sam deploy --template-file $(ORIGIN_TEMPLATE) --tags $(TAGS) --stack-name $(ORIGIN_STACK) --parameter-overrides "OriginAccessIdentity=$(OAI) OriginA=$(ORIGIN_A).s3.ap-southeast-2.amazonaws.com OriginB=$(ORIGIN_B).s3.ap-southeast-2.amazonaws.com"
+
+../edge-functions/src/origins_config.js:
+	@echo "module.exports = {\n  a:'$(ORIGIN_A)',\n  b:'$(ORIGIN_B)'\n};\n" > $@
 
 teardown-origins:
 	aws s3 rb s3://$(ORIGIN_A) --force

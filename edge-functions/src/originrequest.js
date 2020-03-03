@@ -1,10 +1,7 @@
 'use strict';
 
 // the S3 origins that correspond to content for Pool A and Pool B
-const origins = {
-    a:process.env.ORIGIN_A,
-    b:process.env.ORIGIN_B
-};
+const origins = require('./origins_config.js');
 
 // the `pool` cookie determines which origin to route to
 const cookieName = 'pool';
@@ -28,9 +25,9 @@ exports.handler = (event, context, callback) => {
     const headers = request.headers;
     const requestOrigin = request.origin.s3;
     const parsedCookies = parseCookies(headers);
-    
+
     let targetPool = parsedCookies[cookieName];
-    let s3Origin = origins[targetPool];
+    let s3Origin = `${origins[targetPool]}.s3.ap-southeast-2.amazonaws.com`;
     
     requestOrigin.region = 'ap-southeast-2'; 
     requestOrigin.domainName = s3Origin;

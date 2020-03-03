@@ -5,16 +5,18 @@ Description: A/B testing using cloudfront and lambda@edge
 Parameters:
   OriginAccessIdentity:
     Type: String
+  OriginA:
+    Type: String
+  OriginB:
+    Type: String
 
 Resources:
 
   OriginABucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: ab-test-a
+      BucketName: !Ref OriginA
       AccessControl: Private
-      VersioningConfiguration:
-        Status: Suspended
       Tags:
       - Key: purpose
         Value: lab
@@ -24,10 +26,8 @@ Resources:
   OriginBBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: ab-test-b
+      BucketName: !Ref OriginB
       AccessControl: Private
-      VersioningConfiguration:
-        Status: Suspended
       Tags:
       - Key: purpose
         Value: lab
@@ -50,7 +50,6 @@ Resources:
           Action: s3:GetObject
           Resource: 
             - !Join [ "", [ "arn:aws:s3:::", !Ref OriginABucket, "/*"]]
-            # - !Join [ "", [ "arn:aws:s3:::", !Ref OriginBBucket, "/*"]] 
 
   OriginBAccessBucketPolicy:
     Type: AWS::S3::BucketPolicy

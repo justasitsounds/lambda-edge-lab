@@ -2,44 +2,39 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: A/B testing using cloudfront and lambda@edge
 
-Parameters:
-  OriginPrefix:
-    Type: String
+Globals:
+  Function:
+    Runtime: nodejs10.x
+    Timeout: 5
+    AutoPublishAlias: live
+    CodeUri: ../edge-functions/src/
 
 Resources:
-  Globals:
-    Function:
-      Runtime: nodejs10.x
-      Timeout: 5
-      AutoPublishAlias: live
-      CodeUri: edge-functions/src/
-      Environment:
-        Variables:
-          ORIGIN_A: !Join [ "-", [!Ref OriginPrefix, "ab-test-a.s3.ap-southeast-2.amazonaws.com"]]
-          ORIGIN_B: !Join [ "-", [!Ref OriginPrefix, "ab-test-a.s3.ap-southeast-2.amazonaws.com"]]
 
   OriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: OAI
+        Comment: Origin Access Identity for lambda@edge dev lab
   
   ViewerRequestLambda:
     Type: AWS::Serverless::Function
     Properties:
+      Description: Assigns pool cookie if not present on request
       Role: !GetAtt edgeFunctionRole.Arn
       Handler: viewerrequest.handler
 
   OriginRequestLambda:
     Type: AWS::Serverless::Function
     Properties:
+      Description: Changes request Origin depending on value of pool cookie
       Role: !GetAtt edgeFunctionRole.Arn
       Handler: originrequest.handler
         
-
   OriginResponseLambda:
     Type: AWS::Serverless::Function
     Properties:
+      Description: Appends Set-cookie header to match response origin
       Role: !GetAtt edgeFunctionRole.Arn
       Handler: originresponse.handler
 
@@ -144,12 +139,4 @@ Outputs:
     OaiS3CanonicalUserId:
       Description: Origin Access Identity S3CanonicalUserId
       Value: !GetAtt OriginAccessIdentity.S3CanonicalUserId
-
-    S3OriginA:
-      Description: The S3 origin A target
-      Value: !Join [ "-", [!Ref OriginPrefix, "ab-test-a"]]
-
-    S3OriginB:
-      Description: The S3 origin B target
-      Value: !Join [ "-", [!Ref OriginPrefix, "ab-test-b"]]
  
