@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A/B testing using cloudfront and lambda@edge
+
+Resources:
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Origin Access Identity for lambda@edge dev lab
+  
+  LogBucket:
+    Type: "AWS::S3::Bucket"
+
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Logging:
+          Bucket: !GetAtt LogBucket.DomainName
+          IncludeCookies: true
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: 'AB testing Cloudfront distribution' 
+        Origins:
+          - Id: s3
+            DomainName: !GetAtt OriginABucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Join [ "/", [ origin-access-identity, cloudfront, !Ref OriginAccessIdentity ]]
+        DefaultCacheBehavior:
+          TargetOriginId: s3
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+                - pool
+          ViewerProtocolPolicy: redirect-to-https
+          DefaultTTL: 30
+          MinTTL: 0
+          AllowedMethods:
+            - HEAD
+            - GET
+          CachedMethods:
+            - HEAD
+            - GET
+          SmoothStreaming: false
+          Compress: true
+              
+  OriginABucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+      - "-"
+      - - "ab-testing-origin-a"
+        - !Select
+          - 0
+          - !Split
+            - "-"
+            - !Select
+              - 2
+              - !Split
+                - "/"
+                - !Ref "AWS::StackId"
+      AccessControl: Private
+      Tags:
+      - Key: purpose
+        Value: lab
+      - Key: project
+        Value: lambda-edge-ab
+
+  OriginBBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+      - "-"
+      - - "ab-testing-origin-b"
+        - !Select
+          - 0
+          - !Split
+            - "-"
+            - !Select
+              - 2
+              - !Split
+                - "/"
+                - !Ref "AWS::StackId"
+      AccessControl: Private
+      Tags:
+      - Key: purpose
+        Value: lab
+      - Key: project
+        Value: lambda-edge-ab
+
+  OriginAAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: OriginABucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: PolicyForCloudFrontPrivateContentA
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginABucket, "/*"]]
+
+  OriginBAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: OriginBBucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: PolicyForCloudFrontPrivateContentA
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginBBucket, "/*"]] 
+
+Outputs:
+    CFDistribution: 
+      Description: Cloudfront Distribution Domain Name
+      Value: !GetAtt CFDistribution.DomainName
+
+    DistributionID:
+      Description: Cloudfront Distribution ID
+      Value: !Ref CFDistribution 
+ 
+    BucketADomain:
+      Description: Regional Domian name of the A bucket
+      Value: !GetAtt OriginABucket.RegionalDomainName
+
+    BucketBDomain:
+      Description: Regional Domian name of the A bucket
+      Value: !GetAtt OriginBBucket.RegionalDomainName
+
+    LogBucketDomain:
+      Description: Regional Domian name of the log bucket
+      Value: !GetAtt LogBucket.RegionalDomainName

@@ -4,18 +4,7 @@
 const cookieName = 'pool';
 
 //returns cookies as an associative array, given a CloudFront request headers array
-const parseCookies = (headers) => {
-    const parsedCookie = {};
-    if (headers.cookie) {
-        headers.cookie[0].value.split(';').forEach((cookie) => {
-            if (cookie) {
-                const parts = cookie.split('=');
-                parsedCookie[parts[0].trim()] = parts[1].trim();
-            }
-        });
-    }
-    return parsedCookie;
-}
+const parseCookies = require('./common.js').parseCookies;
 
 // returns either 'a' or 'b', with a default probability of 1:1
 const choosePool = (chance = 2) => Math.floor(Math.random()*chance) === 0 ? 'b' : 'a';

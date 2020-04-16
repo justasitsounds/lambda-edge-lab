@@ -10,8 +10,268 @@ Headings with the &#9432; symbol indicate Information only sections of this READ
 Those with the &#9755; symbol indicate action to be taken to complete the lab
 
 
-## &#9432; How do lambda@edge functions work?
+## Pre-requisites
 
+1. An AWS Account
+2. AWS CLI
+3. AWS SAM (Serverless Application Model) CLI
+4. A local copy of this repository (`git clone https://github.com/justasitsounds/lambda-edge-lab.git`)
+
+Follow the instructions for your platform [here](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) to install the AWS SAM CLI.
+
+
+
+## &#9432; What are we building?
+
+Our imaginary scenario is that our colleagues in the marketing team have some ideas about improving customer engagement on our company's website by tweaking some of the design features of our site
+
+The functionality we need:
+1. Randomly split unassigned traffic into two groups or pools
+2. Serve two different variants of content from either of two origin S3 buckets (the `A` or `B` bucket)
+3. Ensure that subsequent requests from the same clients will be served the same content that they first received (session stickyness)
+4. Record and compare the impact the changes make to the customer engagement
+
+
+
+
+To get started we will deploy:
+  - the CloudFront distribution 
+  - an S3 bucket to retain the CloudFront access logs
+  - a CloudFront Origin Access Identity - a special CloudFront user that is associated with our CloudFront distribution (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html)
+  - the two origin S3 buckets with attached bucket policies that grants the Origin Access Identity `s3:getObject` permission on all the resources within the bucket
+
+!! INSERT CF + S3 + access log arch diagram !!
+
+There is a SAM template in this solution `cloudfront-template.yaml` that we will use to deploy this stack. SAM templates are an extension of AWS CloudFormation templates that are focussed on providing a shorthand way of deploying AWS Lambda functions.
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A/B testing using cloudfront and lambda@edge
+
+Resources:
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Origin Access Identity for lambda@edge dev lab
+  
+  LogBucket:
+    Type: "AWS::S3::Bucket"
+
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Logging:
+          Bucket: !GetAtt LogBucket.DomainName
+          IncludeCookies: true
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: 'AB testing Cloudfront distribution' 
+        Origins:
+          - Id: s3
+            DomainName: !GetAtt OriginABucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Join [ "/", [ origin-access-identity, cloudfront, !Ref OriginAccessIdentity ]]
+        DefaultCacheBehavior:
+          TargetOriginId: s3
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+                - pool
+          ViewerProtocolPolicy: redirect-to-https
+          DefaultTTL: 30
+          MinTTL: 0
+          AllowedMethods:
+            - HEAD
+            - GET
+          CachedMethods:
+            - HEAD
+            - GET
+          SmoothStreaming: false
+          Compress: true
+              
+  OriginABucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+      - "-"
+      - - "ab-testing-origina"
+        - !Select
+          - 0
+          - !Split
+            - "-"
+            - !Select
+              - 2
+              - !Split
+                - "/"
+                - !Ref "AWS::StackId"
+      AccessControl: Private
+      Tags:
+      - Key: purpose
+        Value: lab
+      - Key: project
+        Value: lambda-edge-ab
+
+  OriginBBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+      - "-"
+      - - "ab-testing-originb"
+        - !Select
+          - 0
+          - !Split
+            - "-"
+            - !Select
+              - 2
+              - !Split
+                - "/"
+                - !Ref "AWS::StackId"
+      AccessControl: Private
+      Tags:
+      - Key: purpose
+        Value: lab
+      - Key: project
+        Value: lambda-edge-ab
+
+  OriginAAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: OriginABucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: PolicyForCloudFrontPrivateContentA
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginABucket, "/*"]]
+
+  OriginBAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: OriginBBucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: PolicyForCloudFrontPrivateContentB
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginBBucket, "/*"]] 
+
+Outputs:
+    CFDistribution: 
+      Description: Cloudfront Distribution Domain Name
+      Value: !GetAtt CFDistribution.DomainName
+
+    BucketADomain:
+      Description: Regional Domian name of the A bucket
+      Value: !GetAtt OriginABucket.RegionalDomainName
+
+    BucketBDomain:
+      Description: Regional Domian name of the A bucket
+      Value: !GetAtt OriginBBucket.RegionalDomainName
+
+    LogBucketDomain:
+      Description: Regional Domian name of the log bucket
+      Value: !GetAtt LogBucket.RegionalDomainName
+
+```
+
+## &#9755; 1. Deploy the CloudFront stack
+
+Open your terminal and change the working directory to the solution root and then enter this command to deploy this CloudFormation stack
+
+```bash
+sam deploy --template-file cloudfront-template.yml --tags "purpose=lab project=lambda-edge-ab" --stack-name lambda-edge-dist
+```
+
+It will take a little while for the stack to complete deployment. When it does you should see output similar to the following in your terminal - listing the outputs of the cloudformation stack you have deployed:
+
+```bash
+Stack lambda-edge-dist outputs:
+-----------------------------------------------------------------------------------------------------------------------
+OutputKey-Description                                       OutputValue
+-----------------------------------------------------------------------------------------------------------------------
+CFDistribution - Cloudfront Distribution Domain Name        d2h6u5dwxv8fjk.cloudfront.net
+LogBucketDomain - Regional Domian name of the log bucket    lambda-edge-dist2-logbucket-7rmi3pxv2h0v.s3.us-
+                                                            east-1.amazonaws.com
+DistributionID - Cloudfront Distribution ID                 E2S5BSZ6ZQX7GF
+BucketADomain - Regional Domian name of the A bucket        ab-testing-origina-e3393850.s3.us-east-1.amazonaws.com
+BucketBDomain - Regional Domian name of the A bucket        ab-testing-originb-e3393850.s3.us-east-1.amazonaws.com
+-----------------------------------------------------------------------------------------------------------------------
+
+Successfully created/updated stack - lambda-edge-dist in us-east-1
+```
+
+
+So, now we have a cloudfront distribution that is set to serve content from the `A` S3 bucket. The subdomain name of your new CloudFront distribution is randomly generated. To find out what the full domain name is, either refer to the OutputValue that corresponds to the OutputKey `CFDistribution` in the return from the `sam deploy` command described above, or find the deployed CloudFormation stack in your AWS console called `lambda-edge-dist` (make sure you are looking at the N. Virginia region) and find it listed under the output tab there. 
+
+
+![Cloudformation outputs](resources/cloudformation-lambda-dist-output.png)
+
+
+Point your browser to your new CloudFront distribution domain name and you'll see:
+
+
+![access denied](resources/access_denied.png)
+
+
+This is because there is no content in the bucket to serve. Or rather the cloudfront distribution is trying to serve the default root object (index.html) from the S3 bucket, but it's not there.
+
+
+## &#9755; 2. Upload your `A` content using the console
+
+In the content folder of this solution you will see two subfolders: `origin-a` and `origin-b` with two different versions of a single web-page (index.html)
+
+```
+── content
+│   ├── origin-a
+│   │   ├── favicon.ico
+│   │   └── index.html
+│   └── origin-b
+│       ├── favicon.ico
+│       └── index.html
+```
+
+Upload these to the corresponding origin buckets:
+
+
+1. Navigate to the S3 service dashboard in the AWS console (https://s3.console.aws.amazon.com/s3/home)
+2. Find the `A` bucket - it's name should start with `ab-testing-origin-a` ![origin buckets](resources/s3_origin_bucketslist.png)
+3. open the origin A bucket by clicking on it's name ![origin bucket a](resources/origin-a-bucket-empty.png)
+4. Upload the `index.html` and `favicon.ico` files from the local `content/origin-a` folder ![uploaded content bucket a](resources/uploaded-content-origin-a.png) 
+
+Once this is done, check that you can see the `A` content being served from your CloudFront domain by pointing your browser to the .
+
+![origin a](resources/origin_a.png)
+
+
+## &#9755; 3. Upload your `B` content using the console
+
+Repeat the steps listed above to upload the files `content/origin-b/favicon.ico` and `content/origin-a/index.html` to the `B` content bucket (the name starts with `ab-testing-origin-b`)
+
+If you point your browser at the CloudFront distribution domain again, you will only see the `A` content being served. 
+
+In order to change the origin for this CloudFront distribution as we want, we'll need to add some lambda@edge functions to the distribution.
+
+
+
+## &#9432; How do lambda@edge functions work?
 
 lambda@edge functions can be triggered by 4 different CloudFront events that correspond to the following stages of a Cloudfront content request:  
 
@@ -23,216 +283,369 @@ lambda@edge functions can be triggered by 4 different CloudFront events that cor
   -   Before CloudFront forwards the response to the viewer (viewer response)
 
 
-## &#9432; What are we building?
+The CloudFront distribution has been configured to forward `pool` cookies to the Origin - meaning that the `pool` cookie is part of the cache key. This allows us to utilise the caching abilities of CloudFront so that subsequent requests that include a `pool` cookie (`pool=a` or `pool=b`), will fetch the same content from the edge cache without making a request to the Origin.
 
-The lab starts with an already deployed Cloudfront distribution that has 3 lambda@edge functions associated with it: a [Viewer Request function](#viewer-request-function), an [Origin Request function](#origin-request-function) and an [Origin Response function](#origin-response-function). The CloudFront distribution is set to forward `pool` cookies to the Origin - meaning that the `pool` cookie is part of the cache key. This allows us to utilise the caching abilities of CloudFront so that subsequent requests that include a `pool` cookie, will fetch the same content from the edge cache without hitting the Origin
+![lambda@edge functions](resources/lambda@edge_internals.png)
 
 
-![A/B testing Cloudfront distribution internals](resources/lambda@edge_internals.png)
-
-This allows us to:
-1. Randomly split traffic into two groups or pools
-2. Serve two different variants of content from either of two origin S3 buckets (the `A` or `B` bucket)
-3. Ensure that subsequent requests from the same clients will be served the same content that they first received (session stickyness)
-
-### &#9432; Viewer request function:
+### &#9432; Viewer request function - assigning new visitors to content pool `A` or `B`
 
 This function intercepts the viewer request before it is routed to the Cloudfront cache. The code simply adds a `pool` cookie, value: `pool=a` or `pool=b` to the request header if one is not already present. Users without an existing pool cookie are randomly assigned either `pool=a` or `pool=b` with an equal probability (50/50) of being assigned either.
-
-  - [edge-functions/src/viewerrequest.js](edge-functions/src/viewerrequest.js)
 
 
 ### &#9432; Origin Request function:
 
 This function changes the origin bucket location in the request to point to either origin `A` or origin `B` depending on the value of the `pool` cookie.
 
-  - [edge-functions/src/originrequest.js](edge-functions/src/originrequest.js)
-
 
 ### &#9432; Origin Response function:
 
 Adds a `Set-Cookie` header to set the `pool` cookie to match the origin from where the content was served - ensuring that clients that made a requests without a `pool` cookie are instructed to store and send the pool cookie value that matches the origin for subsequent requests.
 
-  - [edge-functions/src/originresponse.js](edge-functions/src/originresponse.js)
 
----
+## &#9755; 4. Write the viewer request Lambda@edge function
 
+Copy and paste the following code into the `edge-functions/viewerrequest.js` file in this solution and save.
 
-### Deploy Bucket A and Bucket B content origins
-
-Currently the OriginRequest lambda@edge function associated with our CloudFront distribution have been configured to change the request origin to either of two origin buckets. In order to complete the lab you will have to create and configure these origin buckets.
-
-#### &#9755; Discover the origin buckets: 
-
-To find out which S3 buckets the Cloudfront distribution has been configured to use as the A and B origin, examine the source code for the lambda@edge functions:
-
-In the console, Switch to us-east-1 region, Select Lambda service.
-
-You should see three lambda functions listed, with names starting with the prefix: `lambda-edge-dist-`:
-IE:
-
-![deployed_lambda-edge_fns.png](resources/deployed_lambda-edge_fns.png)
-
-Select the Origin Response function and scroll down to the inline code editor where you will be able to look at the source code for the deployed functions:
-
-The origin configuration can be found in the shared `origin_config.js` file 
-
-The origin config file will look something like this:
-
-![origins_config](resources/origin_config.png)
-
-These are the fully qualified S3 domain names for the two origin buckets we need to create.
-
-IE:
 ```javascript
-exports = {
-  a:'ab-test-a-11303',
-  b:'ab-test-b-16205'
+'use strict';
+
+// the `pool` cookie designates the user pool that the request belongs to
+const cookieName = 'pool';
+
+//returns cookies as an associative array, given a CloudFront request headers array
+const parseCookies = require('./common.js').parseCookies;
+
+// returns either 'a' or 'b', with a default probability of 1:1
+const choosePool = (chance = 2) => Math.floor(Math.random()*chance) === 0 ? 'b' : 'a';
+
+//if the request does not have a pool cookie - assign one
+exports.handler = (event, context, callback) => {
+    const request = event.Records[0].cf.request;
+    const headers = request.headers;
+    const parsedCookies = parseCookies(headers);
+
+    if(!parsedCookies || !parsedCookies[cookieName]){
+        let targetPool = choosePool();
+        headers['cookie'] = [{ key: 'cookie', value: `${cookieName}=${targetPool}`}]
+    }
+
+    callback(null, request);
 };
 ```
 
-NB. The names of your origin buckets will differ slightly from those shown above.
+## &#9755; 5. Write the origin request Lambda@edge function
 
-#### &#9755; Create the origin buckets:
+Copy and paste the following code into the `edge-functions/originrequest.js` file in this solution and save.
 
-Create origins A & B:
+```javascript
+'use strict';
 
-1. In the AWS Console, navigate to the S3 service: Select the Services drop down in the top left of the screen and select Storage > S3 or search for S3
+// the S3 origins that correspond to content for Pool A and Pool B
+const origins = require('./origins_config.js');
+const parseCookies = require('./common.js').parseCookies;
 
-2. Click the Create Bucket button and create the `a` bucket: 
-   - Bucket name :`ab-test-a-[XXXX]` and region: `Asia Pacific (Sydney)` - replace `[XXXX]` so that it matches the name of the bucket in the origin_config.js
-   ![create bucket](resources/create_bucket.png)
-   - Accept the default options for the following screens:
-   ![create bucket](resources/create_bucket2.png)
-   ![create bucket](resources/create_bucket3.png)
-   ![create bucket](resources/create_bucket4.png)
+// the `pool` cookie determines which origin to route to
+const cookieName = 'pool';
 
-3. Repeat the above steps to create the `b` bucket
+// changes request origin depending on value of the `pool` cookie 
+exports.handler = (event, context, callback) => {
+    const request = event.Records[0].cf.request;
+    const headers = request.headers;
+    const requestOrigin = request.origin.s3;
+    const parsedCookies = parseCookies(headers);
+
+    let targetPool = parsedCookies[cookieName];
+    let s3Origin = `${origins[targetPool]}.s3.us-east-1.amazonaws.com`;
+    
+    requestOrigin.region = 'us-east-1'; 
+    requestOrigin.domainName = s3Origin;
+    headers['host'] = [{ key: 'host', value: s3Origin }];
+
+    callback(null, request);
+};
+```
+
+## &#9755; 6. Write the origin response Lambda@edge function
+
+Copy and paste the following code into the `edge-functions/originresponse.js` file in this solution and save.
+
+```javascript
+'use strict';
+
+// the S3 origins that correspond to content for Pool A and Pool B
+const originconfig = require('./origins_config.js');
+const origins = originconfig.origins;
+
+//returns a set-cookie header based on where the content was served from
+exports.handler = (event, context, callback) => {
+
+    const response = event.Records[0].cf.response; //response from the origin
+    const reqHeaders = event.Records[0].cf.request; //request from cloudfront
+
+    let poolorigin = 'a'; //default origin pool
+
+    if(reqHeaders.origin.s3.domainName.indexOf(origins.b) === 0){
+        poolorigin = 'b';
+    }
+    response.headers['Set-Cookie'] = [{key:'Set-Cookie', value: `pool=${poolorigin}`}];
+
+    callback(null, response);
+};
+```
+
+## &#9755; 7. update the SAM template to include the lambda@edge functions
+
+Below is the updated SAM template that includes the lambda@edge functions and integrates them with the CloudFront distribution. New sections have comments to show the additions. Copy and paste the following to replace the contents of `cloudfront-template.yaml`
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A/B testing using cloudfront and lambda@edge
+
+### The Globals section is a SAM specific element that defines the common attributes of the Lambda@Edge functions we are deploying
+Globals:
+  Function:
+    Runtime: nodejs10.x
+    Timeout: 5
+    AutoPublishAlias: live
+    CodeUri: ../edge-functions/src/
+###
+
+Resources:
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Origin Access Identity for lambda@edge dev lab
+  
+  ### the EdgeFunctionRole is an IAM role that is granted to the Lambda@Edge functions
+  EdgeFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-edgeFunction
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+              - edgelambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+  ###
+
+  ### The Lambda@Edge functions
+  ViewerRequestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Assigns pool cookie if not present on request
+      Role: !GetAtt EdgeFunctionRole.Arn
+      Handler: viewerrequest.handler
+
+  OriginRequestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Changes request Origin depending on value of pool cookie
+      Role: !GetAtt EdgeFunctionRole.Arn
+      Handler: originrequest.handler
+        
+  OriginResponseLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Appends Set-cookie header to match response origin
+      Role: !GetAtt EdgeFunctionRole.Arn
+      Handler: originresponse.handler
+  ###
+
+  LogBucket:
+    Type: "AWS::S3::Bucket"
+
+  CFDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Logging:
+          Bucket: !GetAtt LogBucket.DomainName
+          IncludeCookies: true
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: 'AB testing Cloudfront distribution' 
+        Origins:
+          - Id: s3
+            DomainName: !GetAtt OriginABucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Join [ "/", [ origin-access-identity, cloudfront, !Ref OriginAccessIdentity ]]
+        DefaultCacheBehavior:
+          TargetOriginId: s3
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+                - pool
+          ViewerProtocolPolicy: redirect-to-https
+          DefaultTTL: 30
+          MinTTL: 0
+          AllowedMethods:
+            - HEAD
+            - GET
+          CachedMethods:
+            - HEAD
+            - GET
+          SmoothStreaming: false
+          Compress: true
+          ### Lambda Function Associations - associating the functions with the CloudFront request/response events
+          LambdaFunctionAssociations:
+            - 
+              EventType: viewer-request
+              LambdaFunctionARN: !Ref ViewerRequestLambda.Version
+            - 
+              EventType: origin-request
+              LambdaFunctionARN: !Ref OriginRequestLambda.Version
+            - 
+              EventType: origin-response
+              LambdaFunctionARN: !Ref OriginResponseLambda.Version
+          ###
+              
+  OriginABucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+      - "-"
+      - - "ab-testing-origin-a"
+        - !Select
+          - 0
+          - !Split
+            - "-"
+            - !Select
+              - 2
+              - !Split
+                - "/"
+                - !Ref "AWS::StackId"
+      AccessControl: Private
+      Tags:
+      - Key: purpose
+        Value: lab
+      - Key: project
+        Value: lambda-edge-ab
+
+  OriginBBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+      - "-"
+      - - "ab-testing-origin-b"
+        - !Select
+          - 0
+          - !Split
+            - "-"
+            - !Select
+              - 2
+              - !Split
+                - "/"
+                - !Ref "AWS::StackId"
+      AccessControl: Private
+      Tags:
+      - Key: purpose
+        Value: lab
+      - Key: project
+        Value: lambda-edge-ab
+
+  OriginAAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: OriginABucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: PolicyForCloudFrontPrivateContentA
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginABucket, "/*"]]
+
+  OriginBAccessBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: OriginBBucket
+      PolicyDocument:
+        Version: '2008-10-17'
+        Id: PolicyForCloudFrontPrivateContentA
+        Statement:
+        - Sid: '1'
+          Effect: Allow
+          Principal:
+            CanonicalUser: !GetAtt OriginAccessIdentity.S3CanonicalUserId
+          Action: s3:GetObject
+          Resource: 
+            - !Join [ "", [ "arn:aws:s3:::", !Ref OriginBBucket, "/*"]] 
+
+Outputs:
+    CFDistribution: 
+      Description: Cloudfront Distribution Domain Name
+      Value: !GetAtt CFDistribution.DomainName
+
+    DistributionID:
+      Description: Cloudfront Distribution ID
+      Value: !Ref CFDistribution 
+ 
+    BucketADomain:
+      Description: Regional Domian name of the A bucket
+      Value: !GetAtt OriginABucket.RegionalDomainName
+
+    BucketBDomain:
+      Description: Regional Domian name of the A bucket
+      Value: !GetAtt OriginBBucket.RegionalDomainName
+
+    LogBucketDomain:
+      Description: Regional Domian name of the log bucket
+      Value: !GetAtt LogBucket.RegionalDomainName
+```
 
 
-#### &#9755; Grant CloudFront permission to read from the origin buckets
-
-In order to grant our CloudFront distribution permission to read from our origin buckets we need to use a special identity called an [Origin Access Identity](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html).
-
-The CloudFront distribution that has been set up for this lab has already been associated with an Origin Access Identity. All that is left for us to do is to assign a BucketPolicy to each that explicity allows read access (Action : S3.GetObject) to that Origin Access Identity and therefore to our distribution. 
-
-1. Find the Origin Access Identity ID:
-   - Navigate to the CloudFront Services dashboard
-   - Select `Origin access identity` on the right hand side of the screen:
-   - ![origin access identities](resources/oai_for_lambda_edge_lab.png)
-   - Note the ID of the origin access identity with the description: `Origin Access Identity for lambda@edge dev lab`
-
-2. Add a Bucket Policy to both of the origin buckets:
-   - For each bucket created above, 
-   - Navigate to : Permissions > Bucket Policy:
-   - copy and paste the following Bucket Policy statement, but do not save it yet:
-   ```json
-   {
-       "Version": "2008-10-17",
-       "Id": "PolicyForCloudFrontPrivateContentA",
-       "Statement": [
-           {
-               "Sid": "1",
-               "Effect": "Allow",
-               "Principal": {
-                  "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity E328BOPUFDSEUY"
-               },
-               "Action": "s3:GetObject",
-               "Resource": "arn:aws:s3:::ab-test-a-11303/*"
-           }
-       ]
-   }
-   ```
-   - Before saving, replace the string `E328BOPUFDSEUY` in the above with the ID of the OAI you just discovered and also ensure the resource arn matches that of the bucket
-
-
-Alternatively, using the CLI + Cloudformation/SAM to create the origin buckets & their bucket policies:
-
-1. Query Cloudformation to find the Origin Access Identity that was created in the set-up of the Cloudfront Distribution to retrieve it's canonical user ID (a 63 character string):
+## &#9755; 8. Deploy the updated SAM template
 
 ```bash
-aws cloudformation describe-stacks --stack-name lambda-edge-dist --region us-east-1 --query 'Stacks[0].Outputs[?OutputKey==`OaiS3CanonicalUserId`].OutputValue[]' --output text
+sam deploy --template-file cloudfront-template.yml --stack-name lambda-edge-dist
 ```
 
-2. Using the canonical user ID as well as the names of the origin buckets, as parameter overrides, deploy the origin stack:
-
-```bash
-sam deploy --template-file ./content/origin-template.yml --tags "purpose=lab project=lambda-edge-ab" --parameter-overrides "OriginAccessIdentity=[[OAI]] OriginA=[[ORIGIN_A]] OriginB=[[ORIGIN_B]]"
-```
-
-Where:
-
- - `[[OAI]]` is the value of the canonical user id you fetched previously 
- - `[[ORIGIN_A]]` is the name of the origin A bucket - ie: `ab-test-a-11303`
- - `[[ORIGIN_B]]` is the name of the origin B bucket 
-
-
----
-
-
-### Upload content 
-
-In the content folder of this solution you will see two subfolders: `origin-a` and `origin-b` with two different versions of a single web-page
-
-```
-content/
-├── origin-a
-│   └── index.html
-└── origin-b
-    └── index.html
-```
-
-Upload these to the corresponding origin buckets:
-
-Either:
-
-#### &#9755; using the console
-
-1. S3, select origin A bucket, upload the content/origin-a/index.html and content/origin-a/favicon.ico
-2. S3, select origin B bucket, upload the content/origin-a/index.html and content/origin-b/favicon.ico
-
-
-or: 
-
-#### &#9755; using the CLI
-
-```bash
-aws s3api put-object --bucket [[ORIGIN_A]] --content-type text/html --cache-control max-age=60 --key index.html --body ./content/origin-a/index.html
-aws s3api put-object --bucket [[ORIGIN_A]] --content-type image/vnd.microsoft.icon --cache-control max-age=60 --key favicon.ico --body ./content/origin-a/favicon.ico
-aws s3api put-object --bucket [[ORIGIN_B]] --content-type text/html --cache-control max-age=60 --key index.html --body ./content/origin-b/index.html
-aws s3api put-object --bucket [[ORIGIN_B]] --content-type image/vnd.microsoft.icon --cache-control max-age=60 --key favicon.ico --body ./content/origin-b/favicon.ico
-```
-
-Replace `[[ORIGIN_A]]` and `[[ORIGIN_B]]` with the names of the `origin-a` and `origin-b` 
+This will tkae between 5-10 minutes to complete. Once it is finished, you can proceed to the final stage: Testing!
 
 ---
 
 ## Testing
 
-1. When the cloudfront distribution was created it was assigned an automatically generated domain name - to find out what it is, navigate to the CloudFront service dashboard in the AWS console 
-    ![cloudfront domain](resources/cloudfront_url.png)
-2. You will see a CloudFront distribution with the comment : "AB testing Cloudfront distribution".
-3. Copy and paste the domain name for this distribution into your browser
-4. You will see either of these two pages:
+1. Point your browser at the CloudFront distribution
+2. You will see either of these two pages:
 
     ![origin a](resources/origin_a.png)
 
     ![origin b](resources/origin_b.png)
 
-5. If you open the dev tools (in Chrome: it's under View > Developer Tools > Developer Tools) and examine the Cookies (Chrome Developer Tools > Application tab, Storage : Cookies) you will see that your browser will now have a `pool` session cookie for the current domain, the value of which will match the Origin that the content was served from:
+3. If you open the dev tools (in Chrome: it's under View > Developer Tools > Developer Tools) and examine the Cookies (Chrome Developer Tools > Application tab, Storage : Cookies) you will see that your browser will now have a `pool` session cookie for the current domain, the value of which will match the Origin that the content was served from:
 
     ![pool=a cookie](resources/pool=a_cookie.png)
 
-6. Open the Network tab in the developer tools and ensure that the __Preserve log__ checkbox is checked, then refresh the page any number of times. You will see the same content with each page refresh - the `pool` session cookie ensures that your request will be served content from the same origin. If you examine the response headers while you do this (Chrome: Developer Tools : Network tab) you will see a couple of things:
+4. Open the Network tab in the developer tools and ensure that the __Preserve log__ checkbox is checked, then refresh the page any number of times. You will see the same content with each page refresh - the `pool` session cookie ensures that your request will be served content from the same origin. If you examine the response headers while you do this (Chrome: Developer Tools : Network tab) you will see a couple of things:
    - The initial response will have a `200` (OK) status code and a custom `X-Cache` header with a value: `Miss from cloudfront` - this is a hint from cloudfront that tells us that this content was fetched directly from the origin, and not served from the cloudfront cache. The matching request will have no `Cookie: pool=[[X]]` header, but the server will add a `Set-Cookie: pool=[[X]]` header to the response - this instructs your browser to create the pool cookie and append it to subsequent requests to the same domain.
    - Subsequent requests will have the `Cookie: pool=[[X]]` header and may have a `304` (Not Modified) status code along with an `X-Cache: Hit from cloudfront` header and an `Age` header - this type of response means a couple of things:
       - [304 - not modified](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/304). The server (cloudfront) has recognised that the content being requested has not changed since the client last received a valid copy - this is mediated by the `If-Modified-Since` and `If-None-Match` request headers sent by the client. When your browser receieves the `304` response it actually serves the page content from it's internal cache rather than the full content from the server - this is the purpose of 304 responses, they do not contain a message-body for this reason
       - `X-Cache: Hit from cloudfront` - cloudfront has checked the request against it's edge cache - and not the origin. 
       - The `Age` response header tells us how old the cached copy of the content is in seconds. By default this distribution is configured to only keep a copy of the content in it's cache for 30 seconds - the default cache lifetime can be overridden by adding a `max-age` cache-control header to the content in the S3 origin.
         ![network log](resources/network_log.png)
-7. Change the value of the `pool` cookie to the other origin (if it is currently `a`, change it to `b`) and then refresh the page. You will now see the alternate content for the same resource.
-8. Delete the `pool` cookie and refresh the browser, you have a 50/50 chance of seeing the alternate content.
-9. Another way to see how the cloudfront distribution segments the request pool you can use the command line tool `curl` without cookie support and only display headers:
+5. Change the value of the `pool` cookie to the other origin (if it is currently `a`, change it to `b`) and then refresh the page. You will now see the alternate content for the same resource.
+6. Delete the `pool` cookie and refresh the browser, you have a 50/50 chance of seeing the alternate content.
+7. Another way to see how the cloudfront distribution segments the request pool you can use the command line tool `curl` without cookie support and only display headers:
     ```bash
     curl [[cloudfront distribution url]] -I
     ```

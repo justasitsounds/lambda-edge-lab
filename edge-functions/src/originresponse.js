@@ -1,7 +1,8 @@
 'use strict';
 
 // the S3 origins that correspond to content for Pool A and Pool B
-const origins = require('./origins_config.js');
+const originconfig = require('./origins_config.js');
+const origins = originconfig.origins;
 
 //returns a set-cookie header based on where the content was served from
 exports.handler = (event, context, callback) => {

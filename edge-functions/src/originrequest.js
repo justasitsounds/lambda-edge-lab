@@ -2,22 +2,10 @@
 
 // the S3 origins that correspond to content for Pool A and Pool B
 const origins = require('./origins_config.js');
+const parseCookies = require('./common.js').parseCookies;
 
 // the `pool` cookie determines which origin to route to
 const cookieName = 'pool';
-
-const parseCookies = (headers) => {
-    const parsedCookie = {};
-    if (headers.cookie) {
-        headers.cookie[0].value.split(';').forEach((cookie) => {
-            if (cookie) {
-                const parts = cookie.split('=');
-                parsedCookie[parts[0].trim()] = parts[1].trim();
-            }
-        });
-    }
-    return parsedCookie;
-}
 
 // changes request origin depending on value of the `pool` cookie 
 exports.handler = (event, context, callback) => {
