@@ -1,9 +1,0 @@
-version = 0.1
-[default]
-[default.deploy]
-[default.deploy.parameters]
-stack_name = "lambda-edge-dist"
-s3_prefix = "lambda-edge-dist"
-region = "us-east-1"
-capabilities = "CAPABILITY_IAM"
-
