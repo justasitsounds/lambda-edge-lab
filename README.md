@@ -408,7 +408,7 @@ Globals:
     Runtime: nodejs10.x
     Timeout: 5
     AutoPublishAlias: live
-    CodeUri: ../edge-functions/src/
+    CodeUri: edge-functions/src/
 ###
 
 Resources:
