@@ -32,8 +32,6 @@ The functionality we need:
 4. Record and compare the impact the changes make to the customer engagement
 
 
-
-
 To get started we will deploy:
   - the CloudFront distribution 
   - an S3 bucket to retain the CloudFront access logs
@@ -100,7 +98,7 @@ Resources:
     Properties:
       BucketName: !Join
       - "-"
-      - - "ab-testing-origina"
+      - - "ab-testing-origin-a"
         - !Select
           - 0
           - !Split
@@ -122,7 +120,7 @@ Resources:
     Properties:
       BucketName: !Join
       - "-"
-      - - "ab-testing-originb"
+      - - "ab-testing-origin-b"
         - !Select
           - 0
           - !Split
@@ -254,9 +252,11 @@ Upload these to the corresponding origin buckets:
 1. Navigate to the S3 service dashboard in the AWS console (https://s3.console.aws.amazon.com/s3/home)
 2. Find the `A` bucket - it's name should start with `ab-testing-origin-a` ![origin buckets](resources/s3_origin_bucketslist.png)
 3. open the origin A bucket by clicking on it's name ![origin bucket a](resources/origin-a-bucket-empty.png)
-4. Upload the `index.html` and `favicon.ico` files from the local `content/origin-a` folder ![uploaded content bucket a](resources/uploaded-content-origin-a.png) 
+4. Upload the `index.html` and `favicon.ico` files from the local `content/origin-a` folder. ![uploaded content bucket a](resources/uploaded-content-origin-a.png)
+Once you have selected the files to upload, simply click the 'Upload' button on the left hand side of the dialog to accept the default permissions and properties for those files
+![file upload](resources/file_upload.png)
 
-Once this is done, check that you can see the `A` content being served from your CloudFront domain by pointing your browser to the .
+Once this is done, check that you can see the `A` content being served from your CloudFront domain by pointing your browser to the Cloudfront distribution dmain name again.
 
 ![origin a](resources/origin_a.png)
 
@@ -313,7 +313,7 @@ Copy and paste the following code into the `edge-functions/viewerrequest.js` fil
 // the `pool` cookie designates the user pool that the request belongs to
 const cookieName = 'pool';
 
-//returns cookies as an associative array, given a CloudFront request headers array
+// returns cookies as an associative array, given a CloudFront request headers array
 const parseCookies = require('./common.js').parseCookies;
 
 // returns either 'a' or 'b', with a default probability of 1:1
@@ -326,7 +326,7 @@ exports.handler = (event, context, callback) => {
     const parsedCookies = parseCookies(headers);
 
     if(!parsedCookies || !parsedCookies[cookieName]){
-        let targetPool = choosePool();
+        let targetPool = choosePool(); //pass a Number as argument to change the chance that user is assigned to Pool 'a' or 'b' 
         headers['cookie'] = [{ key: 'cookie', value: `${cookieName}=${targetPool}`}]
     }
 
@@ -374,8 +374,7 @@ Copy and paste the following code into the `edge-functions/originresponse.js` fi
 'use strict';
 
 // the S3 origins that correspond to content for Pool A and Pool B
-const originconfig = require('./origins_config.js');
-const origins = originconfig.origins;
+const origins = require('./origins_config.js');
 
 //returns a set-cookie header based on where the content was served from
 exports.handler = (event, context, callback) => {
@@ -623,7 +622,18 @@ This will tkae between 5-10 minutes to complete. Once it is finished, you can pr
 
 ---
 
-## Testing
+## &#9755; Testing
+
+
+As a quick recap, our requirements are:
+
+1. Randomly split unassigned traffic into two groups or pools
+2. Serve two different variants of content from either of two origin S3 buckets (the `A` or `B` bucket)
+3. Ensure that subsequent requests from the same clients will be served the same content that they first received (session stickyness)
+4. Record and compare the impact the changes make to the customer engagement
+
+
+To test the first three requirements:
 
 1. Point your browser at the CloudFront distribution
 2. You will see either of these two pages:
@@ -645,52 +655,25 @@ This will tkae between 5-10 minutes to complete. Once it is finished, you can pr
         ![network log](resources/network_log.png)
 5. Change the value of the `pool` cookie to the other origin (if it is currently `a`, change it to `b`) and then refresh the page. You will now see the alternate content for the same resource.
 6. Delete the `pool` cookie and refresh the browser, you have a 50/50 chance of seeing the alternate content.
-7. Another way to see how the cloudfront distribution segments the request pool you can use the command line tool `curl` without cookie support and only display headers:
-    ```bash
-    curl [[cloudfront distribution url]] -I
-    ```
 
-    ie:
+To test the last requirement (record and compare the impact the changes make to the customer engagement) you can:
 
-    ```bash
-    $ curl https://d1zgmfxdzld6c1.cloudfront.net/ -I
-    HTTP/1.1 200 OK
-    Content-Type: text/html
-    Content-Length: 265
-    Connection: keep-alive
-    x-amz-id-2: /zGPn/NhYYNIOchCmZiHK/lZrAAW0romq31kcpEkRebJ6ZUWqUd+pyTKzscL4i6kpVucUumNgZw=
-    x-amz-request-id: 68E4BAF29529C48B
-    Date: Tue, 03 Mar 2020 01:04:57 GMT
-    Last-Modified: Mon, 02 Mar 2020 23:28:58 GMT
-    ETag: "eb917878863c53e7524d411549dfabb2"
-    Accept-Ranges: bytes
-    Server: AmazonS3
-    Set-Cookie: pool=b
-    X-Cache: Hit from cloudfront
-    Via: 1.1 3396f08538cae17d7cab5e402e844a55.cloudfront.net (CloudFront)
-    X-Amz-Cf-Pop: HIO50-C2
-    X-Amz-Cf-Id: D7eaOlHsp-dtCte_-t4s8BM3peEpJ-OYGtdo2BfBL4TQ7-o3UzYRnQ==
-    Age: 12 
-
-    $ curl https://d1zgmfxdzld6c1.cloudfront.net/ -I
-    HTTP/1.1 200 OK
-    Content-Type: text/html
-    Content-Length: 266
-    Connection: keep-alive
-    x-amz-id-2: DWwGbd8+lki8CRRAott/bUbZIUE5U1Dq6KC+ETYX+z98vRYQFEPLLfVVuHQdfCEFetCppx2Sh08=
-    x-amz-request-id: 80649D41C2C7E7AF
-    Date: Tue, 03 Mar 2020 01:04:47 GMT
-    Last-Modified: Mon, 02 Mar 2020 23:36:49 GMT
-    ETag: "52558a791313aeada9ed5dd201714d92"
-    Accept-Ranges: bytes
-    Server: AmazonS3
-    Set-Cookie: pool=a
-    X-Cache: Hit from cloudfront
-    Via: 1.1 8acea2e792e5adae36bc6e11fb7a3b02.cloudfront.net (CloudFront)
-    X-Amz-Cf-Pop: HIO50-C2
-    X-Amz-Cf-Id: wr25xRK9qgt0D0dNwOVPksAfFDt1KhGf0Fy-vwSuiGn4AKkXAZvldg==
-    Age: 24
-    ```
+7. [Query the Cloudfront access logs using Athena](https://docs.aws.amazon.com/athena/latest/ug/cloudfront-logs.html). You can segment your user traffic based on the `pool` cookie value in the logs so that you can compare the customer journeys for those customers who received the `A` content and `B` content
 
 
+---
+
+# Cleaning up
+
+1. Delete all content from the log and origin S3 buckets
+
+  a) Navigate to the S3 dashboard in the console
+  b) click on the bucket name for each of the buckets
+  c) select all content in the bucket using the radiobutton and click the 'Delete' button
+
+2. Delete the CloudFormation stack:
+
+  a) Navigate to the CloudFormation dashboard in the S3 console
+  b) Select the radiobutton for the `lambda-edge-dist` stack and click the 'Delete' button
+  c) If there is any content in the the log or origin buckets you will get a DELETE_FAILED status on the cloudformation stack. Delete the content (see above) and try the delete cloudformation stack operation again
 

@@ -12,13 +12,6 @@ const choosePool = (chance = 2) => Math.floor(Math.random()*chance) === 0 ? 'b' 
 //if the request does not have a pool cookie - assign one
 exports.handler = (event, context, callback) => {
     const request = event.Records[0].cf.request;
-    const headers = request.headers;
-    const parsedCookies = parseCookies(headers);
-
-    if(!parsedCookies || !parsedCookies[cookieName]){
-        let targetPool = choosePool();
-        headers['cookie'] = [{ key: 'cookie', value: `${cookieName}=${targetPool}`}]
-    }
 
     callback(null, request);
 };
