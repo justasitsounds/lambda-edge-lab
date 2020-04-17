@@ -2,15 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: A/B testing using cloudfront and lambda@edge
 
-### The Globals section is a SAM specific element that defines the common attributes of the Lambda@Edge functions we are deploying
-Globals:
-  Function:
-    Runtime: nodejs10.x
-    Timeout: 5
-    AutoPublishAlias: live
-    CodeUri: ./edge-functions/src/
-###
-
 Resources:
 
   OriginAccessIdentity:
@@ -19,48 +10,6 @@ Resources:
       CloudFrontOriginAccessIdentityConfig:
         Comment: Origin Access Identity for lambda@edge dev lab
   
-  ### the EdgeFunctionRole is an IAM role that is granted to the Lambda@Edge functions
-  EdgeFunctionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub ${AWS::StackName}-edgeFunction
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          Effect: Allow
-          Principal:
-            Service:
-              - lambda.amazonaws.com
-              - edgelambda.amazonaws.com
-          Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
-  ###
-
-  ### The Lambda@Edge functions
-  ViewerRequestLambda:
-    Type: AWS::Serverless::Function
-    Properties:
-      Description: Assigns pool cookie if not present on request
-      Role: !GetAtt EdgeFunctionRole.Arn
-      Handler: viewerrequest.handler
-
-  OriginRequestLambda:
-    Type: AWS::Serverless::Function
-    Properties:
-      Description: Changes request Origin depending on value of pool cookie
-      Role: !GetAtt EdgeFunctionRole.Arn
-      Handler: originrequest.handler
-        
-  OriginResponseLambda:
-    Type: AWS::Serverless::Function
-    Properties:
-      Description: Appends Set-cookie header to match response origin
-      Role: !GetAtt EdgeFunctionRole.Arn
-      Handler: originresponse.handler
-  ###
-
   LogBucket:
     Type: "AWS::S3::Bucket"
 
@@ -98,18 +47,7 @@ Resources:
             - GET
           SmoothStreaming: false
           Compress: true
-          ### Lambda Function Associations - associating the functions with the CloudFront request/response events
-          LambdaFunctionAssociations:
-            - 
-              EventType: viewer-request
-              LambdaFunctionARN: !Ref ViewerRequestLambda.Version
-            - 
-              EventType: origin-request
-              LambdaFunctionARN: !Ref OriginRequestLambda.Version
-            - 
-              EventType: origin-response
-              LambdaFunctionARN: !Ref OriginResponseLambda.Version
-          ###
+          
               
   OriginABucket:
     Type: AWS::S3::Bucket
