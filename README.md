@@ -198,7 +198,21 @@ Open your terminal and change the working directory to the solution root and the
 sam deploy --stack-name lambda-edge-lab --region us-east-1 -g
 ```
 
-It will take a little while for the stack to complete deployment. When it does you should see output similar to the following in your terminal - listing the outputs of the cloudformation stack you have deployed:
+The CLI will ask a series of questions as you deploy for the first time. 
+
+```bash
+  Stack Name [lambda-edge-lab]:
+	AWS Region [us-east-1]:
+	#Shows you resources changes to be deployed and require a 'Y' to initiate deploy
+	Confirm changes before deploy [y/N]: N
+	#SAM needs permission to be able to create roles to connect to the resources in your template
+	Allow SAM CLI IAM role creation [Y/n]: Y
+	Save arguments to samconfig.toml [Y/n]: Y
+```
+
+Just hit `enter` for each question to accept the default option.
+
+It will take a little while (up to 10 minutes) for the stack to complete deployment. When it does you should see output similar to the following in your terminal - listing the outputs of the cloudformation stack you have deployed:
 
 ```bash
 Stack lambda-edge-dist outputs:
@@ -334,7 +348,37 @@ exports.handler = (event, context, callback) => {
 };
 ```
 
-## &#9755; 5. Write the origin request Lambda@edge function
+## &#9755; 5. update the shared origin_config.js configuration file
+
+Both the `origin_request` and `origin_response` lambda@edge functions depend on a common configuration file that holds the bucket names for the `A` and `B` S3 buckets.
+
+You'll need to update this file with the names of the `A` and `B` origin buckets that were created when you first deployed the solution stack. You can find this name by either looking at the output of the `sam deploy` function if you still have that open in your terminal window: IE:
+
+![sam deploy output](resources/sam-deploy-output.png)
+
+In this deployment example, the name of the `A` bucket is: `ab-testing-origin-a-01207890` and the name of the `B` bucket is: `ab-testing-origin-b-01207890` (note that the name is the first segment of the bucket domain name)
+
+Using these two values, update the code in `edge-functions/origins_config.js` to match. So for the deployment shown above the file would change from:
+
+```javascript
+module.exports = {
+    a:'<REPLACE WITH THE NAME OF YOUR ORIGIN A BUCKET>',
+    b:'<REPLACE WITH THE NAME OF YOUR ORIGIN B BUCKET>'
+};
+```
+
+to
+
+```javascript
+module.exports = {
+    a:'ab-testing-origin-a-01207890',
+    b:'ab-testing-origin-b-01207890'
+};
+```
+
+
+
+## &#9755; 6. Write the origin request Lambda@edge function
 
 Copy and paste the following code into the `edge-functions/originrequest.js` file in this solution and save.
 
@@ -366,7 +410,7 @@ exports.handler = (event, context, callback) => {
 };
 ```
 
-## &#9755; 6. Write the origin response Lambda@edge function
+## &#9755; 7. Write the origin response Lambda@edge function
 
 Copy and paste the following code into the `edge-functions/originresponse.js` file in this solution and save.
 
@@ -393,7 +437,7 @@ exports.handler = (event, context, callback) => {
 };
 ```
 
-## &#9755; 7. update the SAM template to include the lambda@edge functions
+## &#9755; 8. update the SAM template to include the lambda@edge functions
 
 Below is the updated SAM template that includes the lambda@edge functions and integrates them with the CloudFront distribution. New sections have comments to show the additions. Copy and paste the following to replace the contents of `cloudfront-template.yaml`
 
@@ -438,7 +482,7 @@ Resources:
         - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
   ###
 
-  ### The Lambda@Edge functions
+  ### The Lambda@Edge functions - these require the EdgeFunctionRole
   ViewerRequestLambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -612,13 +656,15 @@ Outputs:
 ```
 
 
-## &#9755; 8. Deploy the updated SAM template
+## &#9755; 9. Deploy the updated SAM template
+
+To deploy the updated stack, we just need to invoke the `sam deploy` command again - with specific CAPABILITY_NAMED_IAM capabilites because now our template defines an IAM role: edgeFunctionRole that will be assumed by our lambda@edge functions.
 
 ```bash
-sam deploy --template-file cloudfront-template.yml --stack-name lambda-edge-dist
+sam deploy --capabilities CAPABILITY_NAMED_IAM
 ```
 
-This will tkae between 5-10 minutes to complete. Once it is finished, you can proceed to the final stage: Testing!
+This will take between 5-10 minutes to complete. Once it is finished, you can proceed to the final stage: Testing!
 
 ---
 

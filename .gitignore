@@ -1,4 +1,2 @@
-clickstream.zip
 .DS_Store
-setup/rand.mk
-edge-functions/src/origins_config.js
+samconfig.toml
