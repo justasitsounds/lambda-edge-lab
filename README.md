@@ -195,13 +195,13 @@ Outputs:
 Open your terminal and change the working directory to the solution root and then enter this command to deploy this CloudFormation stack
 
 ```bash
-sam deploy --stack-name lambda-edge-lab --region us-east-1 -g
+sam deploy --stack-name lambda-edge-dist --region us-east-1 -g
 ```
 
 The CLI will ask a series of questions as you deploy for the first time. 
 
 ```bash
-  Stack Name [lambda-edge-lab]:
+	Stack Name [lambda-edge-dist]:
 	AWS Region [us-east-1]:
 	#Shows you resources changes to be deployed and require a 'Y' to initiate deploy
 	Confirm changes before deploy [y/N]: N
@@ -715,7 +715,7 @@ To test the last requirement (record and compare the impact the changes make to 
 
   a) Navigate to the S3 dashboard in the console
   b) click on the bucket name for each of the buckets
-  c) select all content in the bucket using the radiobutton and click the 'Delete' button
+  c) select all content in the bucket using the radiobuttons and click the 'Delete' button
 
 2. Delete the CloudFormation stack:
 
