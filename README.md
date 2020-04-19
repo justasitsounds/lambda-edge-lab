@@ -195,7 +195,7 @@ Outputs:
 Open your terminal and change the working directory to the solution root and then enter this command to deploy this CloudFormation stack
 
 ```bash
-sam deploy --template-file cloudfront-template.yml --tags "purpose=lab project=lambda-edge-ab" --stack-name lambda-edge-dist
+sam deploy --stack-name lambda-edge-lab --region us-east-1 -g
 ```
 
 It will take a little while for the stack to complete deployment. When it does you should see output similar to the following in your terminal - listing the outputs of the cloudformation stack you have deployed:
