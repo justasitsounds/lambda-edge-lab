@@ -356,6 +356,8 @@ You'll need to update this file with the names of the `A` and `B` origin buckets
 
 ![sam deploy output](resources/sam-deploy-output.png)
 
+or by looking at the outputs in the `lambda-edge-dist` stack in the Cloudformation console.
+
 In this deployment example, the name of the `A` bucket is: `ab-testing-origin-a-01207890` and the name of the `B` bucket is: `ab-testing-origin-b-01207890` (note that the name is the first segment of the bucket domain name)
 
 Using these two values, update the code in `edge-functions/origins_config.js` to match. So for the deployment shown above the file would change from:
