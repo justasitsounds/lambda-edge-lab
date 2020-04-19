@@ -715,13 +715,17 @@ To test the last requirement (record and compare the impact the changes make to 
 
 1. Delete all content from the log and origin S3 buckets
 
-  a) Navigate to the S3 dashboard in the console
-  b) click on the bucket name for each of the buckets
-  c) select all content in the bucket using the radiobuttons and click the 'Delete' button
+    a) Navigate to the S3 dashboard in the console
+
+    b) click on the bucket name for each of the buckets
+
+    c) select all content in the bucket using the radiobuttons and click the 'Delete' button
 
 2. Delete the CloudFormation stack:
 
-  a) Navigate to the CloudFormation dashboard in the S3 console
-  b) Select the radiobutton for the `lambda-edge-dist` stack and click the 'Delete' button
-  c) If there is any content in the the log or origin buckets you will get a DELETE_FAILED status on the cloudformation stack. Delete the content (see above) and try the delete cloudformation stack operation again
+    a) Navigate to the CloudFormation dashboard in the S3 console
+    
+    b) Select the radiobutton for the `lambda-edge-dist` stack and click the 'Delete' button
+
+    c) If there is any content in the the log or origin buckets you will get a DELETE_FAILED status on the cloudformation stack. Delete the content (see above) and try the delete cloudformation stack operation again
 
