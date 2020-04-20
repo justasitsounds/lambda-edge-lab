@@ -40,7 +40,7 @@ To get started we will deploy:
 
 !! INSERT CF + S3 + access log arch diagram !!
 
-There is a SAM template in this solution `cloudfront-template.yaml` that we will use to deploy this stack. SAM templates are an extension of AWS CloudFormation templates that are focussed on providing a shorthand way of deploying AWS Lambda functions.
+There is a SAM template in this solution `template.yml` that we will use to deploy this stack. SAM templates are an extension of AWS CloudFormation templates that are focussed on providing a shorthand way of deploying AWS Lambda functions.
 
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'
@@ -441,7 +441,7 @@ exports.handler = (event, context, callback) => {
 
 ## &#9755; 8. update the SAM template to include the lambda@edge functions
 
-Below is the updated SAM template that includes the lambda@edge functions and integrates them with the CloudFront distribution. New sections have comments to show the additions. Copy and paste the following to replace the contents of `cloudfront-template.yaml`
+Below is the updated SAM template that includes the lambda@edge functions and integrates them with the CloudFront distribution. New sections have comments to show the additions. Copy and paste the following to replace the contents of `template.yml`
 
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'
