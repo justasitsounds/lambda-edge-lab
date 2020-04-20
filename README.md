@@ -454,7 +454,6 @@ Globals:
     Runtime: nodejs10.x
     Timeout: 5
     AutoPublishAlias: live
-    CodeUri: edge-functions/src/
 ###
 
 Resources:
@@ -490,6 +489,7 @@ Resources:
     Properties:
       Description: Assigns pool cookie if not present on request
       Role: !GetAtt EdgeFunctionRole.Arn
+      CodeUri: ./edge-functions/src/
       Handler: viewerrequest.handler
 
   OriginRequestLambda:
@@ -497,6 +497,7 @@ Resources:
     Properties:
       Description: Changes request Origin depending on value of pool cookie
       Role: !GetAtt EdgeFunctionRole.Arn
+      CodeUri: ./edge-functions/src/
       Handler: originrequest.handler
         
   OriginResponseLambda:
@@ -504,6 +505,7 @@ Resources:
     Properties:
       Description: Appends Set-cookie header to match response origin
       Role: !GetAtt EdgeFunctionRole.Arn
+      CodeUri: ./edge-functions/src/
       Handler: originresponse.handler
   ###
 
