@@ -1,6 +1,10 @@
 
 # A/B testing with lambda@edge
 
+This lab is provided as part of AWS Builders Online Series.
+
+ℹ️ You will run this lab in your own AWS account. Please follow directions at the end of the lab to remove resources to minimize costs.
+
 In this lab we will learn how we can use lambda@edge functions to serve different variants of the same static resources from a CloudFront distribution.
 
 This ability can be used to enable A/B testing of staticly deployed websites without resorting to complex and resource intensive conditional server-side rendering of content.
@@ -9,16 +13,30 @@ Headings with the &#9432; symbol indicate Information only sections of this READ
 
 Those with the &#9755; symbol indicate action to be taken to complete the lab
 
+## Setting up the Lab Environment
 
-## Pre-requisites
+To run this lab, you will require an AWS account. You will be using Cloud9, which is a web-based development environment that provides a terminal program running on a virtual machine that has the AWS CLI pre-installed and configured
 
-1. An AWS Account
-2. AWS CLI
-3. AWS SAM (Serverless Application Model) CLI
-4. A local copy of this repository (`git clone https://github.com/justasitsounds/lambda-edge-lab.git`)
+1. Login to your [AWS Account Console](https://console.awas.amazon.com)
+2. From the *Services* menu, select *Cloud9*
+  
+  If you are prompted for a region, select the one closest to you.
 
-Follow the instructions for your platform [here](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) to install the AWS SAM CLI.
+3. Click the *Create Environment* button
+4. for Name, enter: `lambda-edge-lab` 
+5. Click *Next step* twice, to accept the default options, then click *Create Environment*
 
+  Cloud9 will take a few minutes to launch the environment. Once it is ready, continue to the next step.
+
+  ![Cloud9 welcome screen](/resources/cloud9_intro.png)
+
+6. In the bash terminal at the bottom of the screen (showing `/environment $`), run the following command to download a copy of this lab to your Cloud9 environment:
+
+  ```bash
+  git clone https://github.com/justasitsounds/lambda-edge-lab
+  ```
+
+  *Hint*: You can expand the size of the terminal pane.
 
 
 ## &#9432; What are we building?
@@ -194,13 +212,14 @@ Outputs:
 
 ## &#9755; 1. Deploy the CloudFront stack
 
-Open your terminal and change the working directory to the solution root and then enter this command to deploy this CloudFormation stack
+In the bash terminal at the bottom of the screen, and enter these commands to deploy this CloudFormation stack
 
 ```bash
+cd ~/environment/lambda-edge-lab
 sam deploy --stack-name lambda-edge-dist --region us-east-1 -g
 ```
 
-The CLI will ask a series of questions as you deploy for the first time. 
+The `SAM CLI` will ask a series of questions as you deploy for the first time. 
 
 ```bash
 	Stack Name [lambda-edge-dist]:
@@ -216,24 +235,10 @@ Just hit `enter` for each question to accept the default option.
 
 It will take a little while (up to 10 minutes) for the stack to complete deployment. When it does you should see output similar to the following in your terminal - listing the outputs of the cloudformation stack you have deployed:
 
-```bash
-Stack lambda-edge-dist outputs:
------------------------------------------------------------------------------------------------------------------------
-OutputKey-Description                                       OutputValue
------------------------------------------------------------------------------------------------------------------------
-CFDistribution - Cloudfront Distribution Domain Name        d2h6u5dwxv8fjk.cloudfront.net
-LogBucketDomain - Regional Domian name of the log bucket    lambda-edge-dist2-logbucket-7rmi3pxv2h0v.s3.us-
-                                                            east-1.amazonaws.com
-DistributionID - Cloudfront Distribution ID                 E2S5BSZ6ZQX7GF
-BucketADomain - Regional Domian name of the A bucket        ab-testing-origina-e3393850.s3.us-east-1.amazonaws.com
-BucketBDomain - Regional Domian name of the A bucket        ab-testing-originb-e3393850.s3.us-east-1.amazonaws.com
------------------------------------------------------------------------------------------------------------------------
-
-Successfully created/updated stack - lambda-edge-dist in us-east-1
-```
+![stack deployed](/resources/first_deploy_done.png)
 
 
-So, now we have a cloudfront distribution that is set to serve content from the `A` S3 bucket. The subdomain name of your new CloudFront distribution is randomly generated. To find out what the full domain name is, either refer to the OutputValue that corresponds to the OutputKey `CFDistribution` in the return from the `sam deploy` command described above, or find the deployed CloudFormation stack in your AWS console called `lambda-edge-dist` (make sure you are looking at the N. Virginia region) and find it listed under the output tab there. 
+So, now we have a cloudfront distribution that is set to serve content from the `A` S3 bucket. The subdomain name of your new CloudFront distribution is randomly generated. To find out what the full domain name is, either refer to the OutputValue that corresponds to the OutputKey `CFDistribution` in the return from the `sam deploy` command described above, or find the deployed CloudFormation stack in your AWS console called `lambda-edge-dist` (In the AWS Console, select *CloudFormation* fro the *Services* menu) make sure you are looking at the N. Virginia region) and find it listed under the output tab there. 
 
 
 ![Cloudformation outputs](resources/cloudformation-lambda-dist-output.png)
@@ -250,25 +255,23 @@ This is because there is no content in the bucket to serve. Or rather the cloudf
 
 ## &#9755; 2. Upload your `A` content using the console
 
-In the content folder of this solution you will see two subfolders: `origin-a` and `origin-b` with two different versions of a single web-page (index.html)
 
-```
-── content
-│   ├── origin-a
-│   │   ├── favicon.ico
-│   │   └── index.html
-│   └── origin-b
-│       ├── favicon.ico
-│       └── index.html
-```
+1. Download and unzip the source files from the github repository to your local machine from the [github repository](https://github.com/justasitsounds/lambda-edge-lab/raw/master/content.zip)  
+  The unzipped files should be arranged like this, with two subfolders: `origin-a` and `origin-b`, both containing two different versions of a single web-page (index.html)
 
-Upload these to the corresponding origin buckets:
-
-
-1. Navigate to the S3 service dashboard in the AWS console (https://s3.console.aws.amazon.com/s3/home)
-2. Find the `A` bucket - it's name should start with `ab-testing-origin-a` ![origin buckets](resources/s3_origin_bucketslist.png)
-3. open the origin A bucket by clicking on it's name ![origin bucket a](resources/origin-a-bucket-empty.png)
-4. Upload the `index.html` and `favicon.ico` files from the local `content/origin-a` folder. ![uploaded content bucket a](resources/uploaded-content-origin-a.png)
+  ```
+  ── content
+  │   ├── origin-a
+  │   │   ├── favicon.ico
+  │   │   └── index.html
+  │   └── origin-b
+  │       ├── favicon.ico
+  │       └── index.html
+  ```
+2. Navigate to the S3 service dashboard in the AWS console (https://s3.console.aws.amazon.com/s3/home)
+3. Find the `A` bucket - it's name should start with `ab-testing-origin-a` ![origin buckets](resources/s3_origin_bucketslist.png)
+4. open the origin A bucket by clicking on it's name ![origin bucket a](resources/origin-a-bucket-empty.png)
+5. Upload the `index.html` and `favicon.ico` files from the local `content/origin-a` folder. ![uploaded content bucket a](resources/uploaded-content-origin-a.png)
 Once you have selected the files to upload, simply click the 'Upload' button on the left hand side of the dialog to accept the default permissions and properties for those files
 ![file upload](resources/file_upload.png)
 
@@ -321,7 +324,7 @@ Adds a `Set-Cookie` header to set the `pool` cookie to match the origin from whe
 
 ## &#9755; 4. Write the viewer request Lambda@edge function
 
-Copy and paste the following code into the `edge-functions/viewerrequest.js` file in this solution and save.
+Open the `edge-functions/viewerrequest.js` file in this solution in your Cloud9 editor. Copy and paste the following code and save.
 
 ```javascript
 'use strict';
@@ -443,7 +446,7 @@ exports.handler = (event, context, callback) => {
 
 ## &#9755; 8. update the SAM template to include the lambda@edge functions
 
-Below is the updated SAM template that includes the lambda@edge functions and integrates them with the CloudFront distribution. New sections have comments to show the additions. Copy and paste the following to replace the contents of `template.yml`
+Below is the updated SAM template that includes the lambda@edge functions and integrates them with the CloudFront distribution. New sections have comments to show the additions. Open the file `template.yml` in the base folder of the solution in Cloud9. Copy and paste the following to update and replace the content of the file. 
 
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'
@@ -664,7 +667,7 @@ Outputs:
 
 ## &#9755; 9. Deploy the updated SAM template
 
-To deploy the updated stack, we just need to invoke the `sam deploy` command again - with specific CAPABILITY_NAMED_IAM capabilites because now our template defines an IAM role: edgeFunctionRole that will be assumed by our lambda@edge functions.
+To deploy the updated stack, we just need to invoke the `sam deploy` command again - with specific CAPABILITY_NAMED_IAM capabilites because now our template defines an IAM role: *edgeFunctionRole* that will be assumed by our lambda@edge functions.
 
 ```bash
 sam deploy --capabilities CAPABILITY_NAMED_IAM
@@ -719,7 +722,7 @@ To test the last requirement (record and compare the impact the changes make to 
 
 1. Delete all content from the log and origin S3 buckets
 
-    a) Navigate to the S3 dashboard in the console
+    a) Open the [AWS Console](https://console.aws.amazon.com) and select *S3* from the *Services* menu to open the S3 dashboard 
 
     b) click on the bucket name for each of the buckets
 
@@ -727,7 +730,7 @@ To test the last requirement (record and compare the impact the changes make to 
 
 2. Delete the CloudFormation stack:
 
-    a) Navigate to the CloudFormation dashboard in the S3 console
+    a) Open the [AWS Console](https://console.aws.amazon.com) and select *CloudFormation* from the *Services* menu to open the CloudFormation dashboard 
     
     b) Select the radiobutton for the `lambda-edge-dist` stack and click the 'Delete' button
 
