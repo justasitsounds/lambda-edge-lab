@@ -38,7 +38,9 @@ To get started we will deploy:
   - a CloudFront Origin Access Identity - a special CloudFront user that is associated with our CloudFront distribution (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html)
   - the two origin S3 buckets with attached bucket policies that grants the Origin Access Identity `s3:getObject` permission on all the resources within the bucket
 
-!! INSERT CF + S3 + access log arch diagram !!
+
+![Simple architecture](resources/simple_arch_diagram.png)
+
 
 There is a SAM template in this solution `template.yml` that we will use to deploy this stack. SAM templates are an extension of AWS CloudFormation templates that are focussed on providing a shorthand way of deploying AWS Lambda functions.
 
