@@ -1,9 +1,12 @@
 
 # A/B testing with lambda@edge
 
-This lab is provided as part of AWS Builders Online Series.
+This lab is provided as part of [AWS Summit Online](https://aws.amazon.com/events/summits/online/).
 
-ℹ️ You will run this lab in your own AWS account. Please follow directions at the end of the lab to remove resources to minimize costs.
+ℹ️ You will run this lab in your own AWS account. Please follow directions at the end of the lab to remove resources to avoid future costs.
+
+
+## Overview
 
 In this lab we will learn how we can use lambda@edge functions to serve different variants of the same static resources from a CloudFront distribution.
 
@@ -12,6 +15,7 @@ This ability can be used to enable A/B testing of staticly deployed websites wit
 Headings with the &#9432; symbol indicate Information only sections of this README
 
 Those with the &#9755; symbol indicate action to be taken to complete the lab
+
 
 ## Setting up the Lab Environment
 
